@@ -21,61 +21,17 @@ export interface Product {
 }
 
 export interface CartItem extends Product {
-  size: 'P' | 'M' | 'G' | 'Família';
+  size: 'P' | 'M' | 'G';
   toppings: string[];
   quantity: number;
   finalPrice: number;
-}
-
-export interface StatCardProps {
-  title: string;
-  value: string;
-  trend: string;
-  isPositive: boolean;
-  icon: React.ReactNode;
-}
-
-export enum AppMode {
-  CUSTOMER = 'CUSTOMER',
-  ADMIN = 'ADMIN'
-}
-
-export type AdminView = 'overview' | 'orders' | 'financials' | 'products' | 'settings';
-
-export interface ToastNotification {
-  id: string;
-  message: string;
-  type: 'success' | 'info';
-}
-
-// Novos Tipos para Admin
-export interface FinancialRecord {
-  id: string;
-  date: string;
-  description: string;
-  category: string;
-  amount: number;
-  type: 'income' | 'expense';
-  status: 'completed' | 'pending';
-}
-
-export interface OrderDetailType {
-  id: string;
-  customerName: string;
-  customerPhone: string;
-  address: string;
-  items: string[];
-  total: number;
-  status: string;
-  time: string;
-  paymentMethod: string;
 }
 
 export interface UserOrder {
   id: string;
   date: string;
   total: number;
-  status: 'Entregue' | 'Cancelado' | 'Em Preparo';
+  status: string;
   items: {
     productId: string;
     name: string;
@@ -87,22 +43,25 @@ export interface UserOrder {
 export interface User {
   name: string;
   email: string;
-  password?: string; // Em produção, nunca armazenar senha plana
   avatar?: string;
   orders: UserOrder[];
 }
 
-// Mercado Pago Types
-export interface PixPaymentResponse {
-  id: number;
-  status: string;
-  point_of_interaction: {
-    transaction_data: {
-      qr_code: string;
-      qr_code_base64: string;
-      ticket_url: string;
-    }
-  };
+export interface PixConfig {
+  key: string;
+  bank: string;
+  owner: string;
+}
+
+// Admin Types
+export interface FinancialRecord {
+  id: string;
+  date: string;
+  description: string;
+  category: string;
+  amount: number;
+  type: 'income' | 'expense';
+  status: 'completed' | 'pending';
 }
 
 export interface Partner {
@@ -121,4 +80,38 @@ export interface Campaign {
   reach: number;
   conversion: number;
   cost: number;
+}
+
+export interface OrderDetailType {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  address: string;
+  items: string[];
+  total: number;
+  status: string;
+  time: string;
+  paymentMethod: string;
+}
+
+// UI Types
+export enum AppMode {
+  CUSTOMER = 'customer',
+  ADMIN = 'admin'
+}
+
+export type AdminView = 'overview' | 'orders' | 'products' | 'financials' | 'settings';
+
+export interface StatCardProps {
+  title: string;
+  value: string;
+  trend: string;
+  isPositive: boolean;
+  icon: React.ReactNode;
+}
+
+export interface ToastNotification {
+  id: string;
+  message: string;
+  type: 'success' | 'info' | 'error';
 }

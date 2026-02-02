@@ -1,129 +1,114 @@
-import { CartItem, PixPaymentResponse } from '../types';
+import { PixConfig } from '../types';
 
-// Agora apontamos para o nosso backend local, não diretamente para o MP
-// Certifique-se de rodar 'node server.js' no terminal
-const BACKEND_URL = 'http://localhost:3001/api/process_payment';
+export const getPixConfig = (): PixConfig => {
+  return {
+    key: localStorage.getItem('creamy_pix_key') || '',
+    bank: localStorage.getItem('creamy_pix_bank') || '',
+    owner: localStorage.getItem('creamy_pix_owner') || ''
+  };
+};
+
+// --- Funções Auxiliares para Geração do Payload Pix (EMV QRCPS MPM) ---
 
 /**
- * Recupera o token de acesso. Prioridade:
- * 1. LocalStorage (Configurado via Painel Admin)
- * 2. Variável de Ambiente (Configurado no Build/Deploy)
+ * Calcula o CRC16-CCITT (0xFFFF) necessário para o padrão Pix
  */
-const getAccessToken = () => {
-  return localStorage.getItem('mp_access_token') || process.env.REACT_APP_MP_ACCESS_TOKEN || '';
+function getCRC16(payload: string): string {
+  let crc = 0xFFFF;
+  const polynomial = 0x1021;
+
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = (crc << 1) ^ polynomial;
+      } else {
+        crc = crc << 1;
+      }
+    }
+  }
+  
+  return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+}
+
+/**
+ * Formata um campo TLV (Type-Length-Value)
+ */
+function formatField(id: string, value: string): string {
+  const len = value.length.toString().padStart(2, '0');
+  return `${id}${len}${value}`;
+}
+
+/**
+ * Remove acentos e caracteres especiais para compatibilidade
+ */
+function normalizeText(text: string): string {
+  return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+}
+
+/**
+ * Gera a string completa do Payload Pix
+ */
+export const generatePixPayload = (
+  key: string, 
+  name: string, 
+  city: string = 'SAO PAULO', 
+  amount?: number, 
+  txid: string = '***'
+): string => {
+  const cleanKey = key.trim();
+  const cleanName = normalizeText(name).substring(0, 25) || 'MERCHANT';
+  const cleanCity = normalizeText(city).substring(0, 15) || 'SAO PAULO';
+  const cleanTxId = txid || '***';
+
+  // 00 - Payload Format Indicator
+  // 26 - Merchant Account Information (GUI + Chave)
+  // 52 - Merchant Category Code
+  // 53 - Transaction Currency
+  // 54 - Transaction Amount (Opcional)
+  // 58 - Country Code
+  // 59 - Merchant Name
+  // 60 - Merchant City
+  // 62 - Additional Data Field Template (TxID)
+  // 63 - CRC16
+
+  const merchantAccountInfo = formatField('00', 'br.gov.bcb.pix') + formatField('01', cleanKey);
+  
+  let payload = 
+    formatField('00', '01') + // Format Indicator
+    formatField('26', merchantAccountInfo) + 
+    formatField('52', '0000') + // MCC
+    formatField('53', '986');   // Currency (BRL)
+
+  if (amount && amount > 0) {
+    payload += formatField('54', amount.toFixed(2));
+  }
+
+  payload += 
+    formatField('58', 'BR') +
+    formatField('59', cleanName) +
+    formatField('60', cleanCity) +
+    formatField('62', formatField('05', cleanTxId));
+
+  payload += '6304'; // Adiciona ID do CRC e tamanho (04)
+
+  const crc = getCRC16(payload);
+  return payload + crc;
 };
 
 /**
- * Função de Fallback (Simulação)
- * Mantida para garantir que o app funcione mesmo sem o Backend rodando
+ * Gera a URL do QR Code usando o Payload Pix correto em vez de apenas a chave.
+ * Aceita parâmetros opcionais para gerar QR Codes com valor definido.
  */
-async function generateFallbackPix(total: number): Promise<PixPaymentResponse> {
-  await new Promise(resolve => setTimeout(resolve, 1500));
-
-  const pixCopyAndPaste = "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540510.005802BR5913Creamy Delivery6008Sao Paulo62070503***6304E2CA";
+export const getPixQrCodeUrl = (key: string, name: string = '', amount?: number): string => {
+  if (!key) return '';
   
-  // Tenta gerar imagem visualmente usando API pública
-  let qrCodeBase64 = "";
-  try {
-    const response = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(pixCopyAndPaste)}`);
-    const blob = await response.blob();
-    const reader = new FileReader();
-    qrCodeBase64 = await new Promise((resolve) => {
-      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-      reader.readAsDataURL(blob);
-    });
-  } catch (e) {
-    console.warn("Falha ao gerar QR visual simulado");
-  }
-
-  return {
-    id: Math.floor(Math.random() * 1000000000),
-    status: 'pending',
-    point_of_interaction: {
-      transaction_data: {
-        qr_code: pixCopyAndPaste,
-        qr_code_base64: qrCodeBase64,
-        ticket_url: "https://mercadopago.com.br"
-      }
-    }
-  };
-}
-
-export const createPixPayment = async (
-  items: CartItem[], 
-  total: number, 
-  payerEmail: string = 'cliente@creamy.com.br'
-): Promise<PixPaymentResponse | null> => {
+  // Se não tiver nome configurado, usa um genérico
+  const merchantName = name || 'PudiMousse';
   
-  const token = getAccessToken();
-
-  if (!token) {
-    console.info("Modo Simulação: Token não configurado no Admin.");
-    return generateFallbackPix(total);
-  }
-
-  // Validação de segurança básica do formato do token
-  if (!token.startsWith('APP_USR-') && !token.startsWith('TEST-')) {
-    console.warn("Token inválido. Use um Access Token (APP_USR- ou TEST-).");
-    return generateFallbackPix(total);
-  }
-
-  try {
-    const paymentData = {
-      transaction_amount: Number(total.toFixed(2)),
-      description: `Pedido Creamy - ${items.length} itens`,
-      payment_method_id: "pix",
-      payer: {
-        email: payerEmail,
-        first_name: "Cliente",
-        last_name: "Creamy"
-      },
-      notification_url: "https://seusite.com/api/webhooks/mercadopago",
-      idempotencyKey: crypto.randomUUID()
-    };
-
-    console.log("Enviando requisição para Backend Local...");
-
-    // Chamada ao Backend Local (server.js)
-    const response = await fetch(BACKEND_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`, // Passamos o token para o backend autenticar
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(paymentData)
-    });
-
-    if (!response.ok) {
-      // Se o backend responder com erro, ou se o backend estiver offline (catch)
-      throw new Error(`Erro do Backend: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    // Verifica se o Mercado Pago retornou erro encapsulado
-    if (data.error || data.status === 400 || data.status === 401) {
-       console.error("Erro retornado pelo MP via Backend:", data);
-       throw new Error("Erro de validação do Mercado Pago");
-    }
-
-    return {
-      id: data.id,
-      status: data.status,
-      point_of_interaction: {
-        transaction_data: {
-          qr_code: data.point_of_interaction.transaction_data.qr_code,
-          qr_code_base64: data.point_of_interaction.transaction_data.qr_code_base64,
-          ticket_url: data.point_of_interaction.transaction_data.ticket_url
-        }
-      }
-    };
-
-  } catch (error) {
-    console.error("FALHA NA INTEGRAÇÃO COM BACKEND:", error);
-    console.warn("Verifique se você rodou 'node server.js' no terminal.");
-    console.info("Usando Fallback (Simulação) para não travar o usuário.");
-    
-    return generateFallbackPix(total);
-  }
+  // Gera o código BRCode oficial
+  const payload = generatePixPayload(key, merchantName, 'SAO PAULO', amount);
+  
+  // Retorna URL da API de QR Code com o payload codificado
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(payload)}`;
 };

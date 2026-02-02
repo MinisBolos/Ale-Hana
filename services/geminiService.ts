@@ -9,7 +9,7 @@ export const getDessertRecommendation = async (mood: string, products: string): 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `
-        Você é um expert sommelier de sobremesas para um app de delivery de alto padrão chamado "Creamy", que vende Pudins e Mousses.
+        Você é um expert sommelier de sobremesas para um app de delivery de alto padrão chamado "PudiMousse", que vende Pudins e Mousses Artesanais.
         
         O usuário está se sentindo: "${mood}".
         

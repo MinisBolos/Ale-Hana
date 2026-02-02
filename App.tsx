@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { MOCK_PRODUCTS, SIZES } from './constants';
-import { Product, CartItem, AppMode, AdminView, ToastNotification, PixPaymentResponse, User, UserOrder } from './types';
+import { Product, CartItem, AppMode, AdminView, ToastNotification, PixConfig, User, UserOrder } from './types';
 import { NavBar } from './components/NavBar';
 import { ProductCard } from './components/ProductCard';
 import { ProductDetail } from './pages/ProductDetail';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { Profile } from './pages/Profile';
 import { AdminSidebar } from './components/AdminSidebar';
-import { createPixPayment } from './services/paymentService';
-import { Search, MapPin, ChevronRight, CheckCircle, X, ShoppingBag, Copy, Loader2, QrCode, Download, Lock } from 'lucide-react';
+import { getPixConfig, getPixQrCodeUrl } from './services/paymentService';
+import { Search, MapPin, ChevronRight, CheckCircle, X, ShoppingBag, Copy, Loader2, QrCode, Download, Lock, MessageCircle } from 'lucide-react';
 
 const SHIPPING_COST = 4.00;
 
@@ -21,7 +21,23 @@ interface FlyingItem {
 
 const App: React.FC = () => {
   const [currentPage, setPage] = useState('home');
-  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
+  
+  // Products State with Persistence and Error Safety
+  const [products, setProducts] = useState<Product[]>(() => {
+    try {
+      const savedProducts = localStorage.getItem('creamy_products');
+      return savedProducts ? JSON.parse(savedProducts) : MOCK_PRODUCTS;
+    } catch (e) {
+      console.error("Error loading products:", e);
+      return MOCK_PRODUCTS;
+    }
+  });
+
+  // Save products to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('creamy_products', JSON.stringify(products));
+  }, [products]);
+
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [mode, setMode] = useState<AppMode>(AppMode.CUSTOMER);
@@ -38,6 +54,9 @@ const App: React.FC = () => {
   const [adminId, setAdminId] = useState('');
   const [adminPass, setAdminPass] = useState('');
   
+  // Sidebar State for Mobile
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
   // Interactivity States
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -47,7 +66,7 @@ const App: React.FC = () => {
   
   // Payment States
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [pixData, setPixData] = useState<PixPaymentResponse | null>(null);
+  const [pixDetails, setPixDetails] = useState<PixConfig | null>(null);
   const [showPixModal, setShowPixModal] = useState(false);
 
   // PWA Install State
@@ -122,7 +141,7 @@ const App: React.FC = () => {
     if (outcome === 'accepted') {
       setDeferredPrompt(null);
       setShowInstallBanner(false);
-      showNotification("Obrigado por instalar o Creamy!", "success");
+      showNotification("Obrigado por instalar o PudiMousse!", "success");
     }
   };
 
@@ -141,18 +160,18 @@ const App: React.FC = () => {
 
   // Product Management Handlers
   const handleAddProduct = (newProduct: Product) => {
-    setProducts([...products, newProduct]);
+    setProducts(prev => [...prev, newProduct]);
     showNotification("Produto adicionado com sucesso!", "success");
   };
 
   const handleEditProduct = (updatedProduct: Product) => {
-    setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+    setProducts(prev => prev.map(p => p.id === updatedProduct.id ? updatedProduct : p));
     showNotification("Produto atualizado!", "success");
   };
 
   const handleDeleteProduct = (id: string) => {
     if (window.confirm("Tem certeza que deseja excluir este produto?")) {
-        setProducts(products.filter(p => p.id !== id));
+        setProducts(prev => prev.filter(p => p.id !== id));
         showNotification("Produto removido.", "info");
     }
   };
@@ -216,30 +235,25 @@ const App: React.FC = () => {
     
     setIsProcessingPayment(true);
     
-    // Pass current logged in user email if available, otherwise default is used inside service
-    const userEmail = currentUser?.email;
-    const response = await createPixPayment(cartItems, cartTotal, userEmail);
-    
-    setIsProcessingPayment(false);
-    
-    if (response) {
-      setPixData(response);
-      setShowPixModal(true);
-    } else {
-      showNotification("Erro ao gerar Pix. Tente novamente.", "info");
-    }
+    // Simulating processing time
+    setTimeout(() => {
+        const config = getPixConfig();
+        setPixDetails(config);
+        setIsProcessingPayment(false);
+        setShowPixModal(true);
+    }, 800);
   };
 
-  const copyPixCode = () => {
-    if (pixData?.point_of_interaction?.transaction_data?.qr_code) {
-      navigator.clipboard.writeText(pixData.point_of_interaction.transaction_data.qr_code);
-      showNotification("Código Pix copiado!", "success");
+  const copyPixKey = () => {
+    if (pixDetails?.key) {
+      navigator.clipboard.writeText(pixDetails.key);
+      showNotification("Chave Pix copiada!", "success");
     }
   };
 
   const confirmPixPayment = () => {
     setShowPixModal(false);
-    setPixData(null);
+    setPixDetails(null);
     setShowCheckoutSuccess(true);
     
     // Save order if user is logged in
@@ -275,8 +289,14 @@ const App: React.FC = () => {
   // If in Admin Mode, render the Dashboard
   if (mode === AppMode.ADMIN) {
     return (
-        <div className="flex bg-slate-50 min-h-screen">
-            <AdminSidebar setMode={setMode} activeView={adminView} setView={setAdminView} />
+        <div className="flex bg-slate-50 min-h-screen relative">
+            <AdminSidebar 
+                setMode={setMode} 
+                activeView={adminView} 
+                setView={setAdminView} 
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+            />
             <div className="flex-1 w-full md:ml-0">
                <AdminDashboard 
                  activeView={adminView}
@@ -284,15 +304,8 @@ const App: React.FC = () => {
                  onAddProduct={handleAddProduct}
                  onEditProduct={handleEditProduct}
                  onDeleteProduct={handleDeleteProduct}
+                 onMenuClick={() => setIsSidebarOpen(true)}
                />
-            </div>
-            {/* Mobile Admin Warning */}
-            <div className="md:hidden fixed inset-0 bg-slate-900 flex items-center justify-center text-white p-8 text-center z-50">
-               <div>
-                  <h2 className="text-xl font-bold mb-2">Painel Admin</h2>
-                  <p className="text-slate-400 mb-4">Por favor, use um computador para acessar o dashboard completo.</p>
-                  <button onClick={() => setMode(AppMode.CUSTOMER)} className="bg-amber-600 px-4 py-2 rounded-lg">Voltar ao App</button>
-               </div>
             </div>
         </div>
     );
@@ -405,65 +418,87 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* PIX Payment Modal */}
-        {showPixModal && pixData && (
+        {/* PIX Payment Modal (MANUAL) */}
+        {showPixModal && pixDetails && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 duration-300">
-                <div className="flex justify-between items-center mb-6">
+            <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom-10 duration-300 flex flex-col max-h-[90vh]">
+                <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                         <QrCode className="text-green-600" />
-                        Pagamento via Pix
+                        Pix Manual
                     </h3>
                     <button onClick={() => setShowPixModal(false)} className="text-gray-400 hover:text-gray-600">
                         <X size={24} />
                     </button>
                 </div>
                 
-                <div className="text-center mb-6">
-                    <p className="text-gray-500 text-sm mb-2">Total a pagar</p>
-                    <p className="text-3xl font-bold text-gray-900">R$ {cartTotal.toFixed(2)}</p>
-                </div>
-
-                <div className="bg-gray-100 p-4 rounded-xl mb-6 flex items-center justify-center">
-                    {/* Exibe o QR Code Base64 se disponível, senão um fallback visual */}
-                    {pixData.point_of_interaction.transaction_data.qr_code_base64 && pixData.point_of_interaction.transaction_data.qr_code_base64.length > 50 ? (
-                        <img 
-                            src={`data:image/png;base64,${pixData.point_of_interaction.transaction_data.qr_code_base64}`} 
-                            alt="QR Code Pix" 
-                            className="w-48 h-48 object-contain mix-blend-multiply"
-                        />
-                    ) : (
-                        <div className="w-48 h-48 bg-white border-2 border-gray-200 border-dashed rounded-lg flex flex-col items-center justify-center text-gray-400 gap-2">
-                           <QrCode size={48} />
-                           <span className="text-xs text-center px-4">QR Code Simulado (CORS Bloqueado)</span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="space-y-3">
-                    <div className="relative">
-                        <p className="text-xs text-gray-500 font-bold uppercase mb-1 ml-1">Código Copia e Cola</p>
-                        <div className="flex gap-2">
-                            <input 
-                                readOnly 
-                                value={pixData.point_of_interaction.transaction_data.qr_code}
-                                className="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 text-xs text-gray-600 font-mono truncate"
-                            />
-                            <button 
-                                onClick={copyPixCode}
-                                className="bg-gray-900 text-white p-3 rounded-lg hover:bg-gray-800 transition-colors"
-                            >
-                                <Copy size={18} />
-                            </button>
-                        </div>
+                <div className="overflow-y-auto pr-1">
+                    <div className="text-center mb-6">
+                        <p className="text-gray-500 text-sm mb-2">Total a pagar</p>
+                        <p className="text-3xl font-bold text-gray-900">R$ {cartTotal.toFixed(2)}</p>
                     </div>
-                    
-                    <button 
-                        onClick={confirmPixPayment}
-                        className="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-100 mt-4 active:scale-95 transition-transform"
-                    >
-                        Já realizei o pagamento
-                    </button>
+
+                    <div className="bg-gray-100 p-4 rounded-xl mb-6 flex flex-col items-center justify-center gap-3">
+                        {/* Visual QR Code based on key and AMOUNT */}
+                        {pixDetails.key && (
+                            <img 
+                                src={getPixQrCodeUrl(pixDetails.key, pixDetails.owner, cartTotal)} 
+                                alt="QR Code Pix" 
+                                className="w-40 h-40 mix-blend-multiply" 
+                            />
+                        )}
+                        <p className="text-[10px] text-gray-400 text-center">
+                           Escaneie para pagar o valor exato
+                        </p>
+                    </div>
+
+                    <div className="space-y-4 mb-6 text-sm text-gray-600">
+                         <div className="flex justify-between border-b border-gray-100 pb-2">
+                            <span className="text-gray-400">Banco:</span>
+                            <span className="font-bold text-gray-800">{pixDetails.bank || 'Não informado'}</span>
+                         </div>
+                         <div className="flex justify-between border-b border-gray-100 pb-2">
+                            <span className="text-gray-400">Titular:</span>
+                            <span className="font-bold text-gray-800 text-right">{pixDetails.owner || 'Não informado'}</span>
+                         </div>
+                    </div>
+
+                    <div className="space-y-3">
+                        <div className="relative">
+                            <p className="text-xs text-gray-500 font-bold uppercase mb-1 ml-1">Chave Pix</p>
+                            <div className="flex gap-2">
+                                <input 
+                                    readOnly 
+                                    value={pixDetails.key || 'Chave não configurada'}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 text-xs text-gray-600 font-mono truncate"
+                                />
+                                <button 
+                                    onClick={copyPixKey}
+                                    className="bg-gray-900 text-white p-3 rounded-lg hover:bg-gray-800 transition-colors"
+                                >
+                                    <Copy size={18} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* WhatsApp Button */}
+                        <a 
+                            href={`https://wa.me/5521995612947?text=${encodeURIComponent(`Olá, segue o comprovante do pedido. Valor total: R$ ${cartTotal.toFixed(2)}`)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full bg-green-500 text-white py-3 rounded-xl font-bold shadow-lg shadow-green-100 hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <MessageCircle size={20} />
+                            Enviar Comprovante
+                        </a>
+                        
+                        <button 
+                            onClick={confirmPixPayment}
+                            className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold shadow-lg shadow-gray-200 active:scale-95 transition-transform"
+                        >
+                            Já enviei o comprovante
+                        </button>
+                    </div>
                 </div>
             </div>
           </div>
@@ -557,7 +592,7 @@ const App: React.FC = () => {
                               className="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-100 mb-3 active:scale-95 transition-transform flex items-center justify-center gap-2"
                             >
                                 {isProcessingPayment ? <Loader2 className="animate-spin" /> : <QrCode size={20} />}
-                                {isProcessingPayment ? 'Gerando Pix...' : 'Pagar com Pix'}
+                                {isProcessingPayment ? 'Gerando dados...' : 'Pagar com Pix'}
                             </button>
                         </div>
                     </>

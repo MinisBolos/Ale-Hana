@@ -3,8 +3,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { ShoppingBag, DollarSign, Users, Activity, ArrowLeft, Download, CheckCircle, Clock, CreditCard, TrendingUp, TrendingDown, Plus, Pencil, Trash2, X, Save, Upload, Trash, ShieldCheck, Key } from 'lucide-react';
-import { StatCardProps, AdminView, OrderDetailType, Product, FinancialRecord } from '../types';
+import { ShoppingBag, DollarSign, Users, Activity, ArrowLeft, Download, CheckCircle, Clock, CreditCard, TrendingUp, TrendingDown, Plus, Pencil, Trash2, X, Save, Upload, Trash, ShieldCheck, Landmark, Menu } from 'lucide-react';
+import { StatCardProps, AdminView, OrderDetailType, Product, FinancialRecord, PixConfig } from '../types';
 import { MOCK_FINANCIALS, MOCK_ORDERS_DETAIL } from '../constants';
 
 // Mock Data for Overview Charts
@@ -47,6 +47,7 @@ interface AdminDashboardProps {
   onAddProduct: (product: Product) => void;
   onEditProduct: (product: Product) => void;
   onDeleteProduct: (id: string) => void;
+  onMenuClick: () => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
@@ -54,29 +55,51 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   products, 
   onAddProduct, 
   onEditProduct,
-  onDeleteProduct 
+  onDeleteProduct,
+  onMenuClick
 }) => {
   const [selectedOrder, setSelectedOrder] = useState<OrderDetailType | null>(null);
   
-  // Financial State (allows reset)
-  const [financials, setFinancials] = useState<FinancialRecord[]>(MOCK_FINANCIALS);
+  // Financial State (with Persistence and Safety)
+  const [financials, setFinancials] = useState<FinancialRecord[]>(() => {
+    try {
+      const savedFinancials = localStorage.getItem('creamy_financials');
+      return savedFinancials ? JSON.parse(savedFinancials) : MOCK_FINANCIALS;
+    } catch (error) {
+      console.error("Erro ao carregar financeiro:", error);
+      return MOCK_FINANCIALS;
+    }
+  });
+
+  // Save financials whenever they change
+  useEffect(() => {
+    localStorage.setItem('creamy_financials', JSON.stringify(financials));
+  }, [financials]);
 
   // Product Management State
   const [isEditingProduct, setIsEditingProduct] = useState(false);
   const [productForm, setProductForm] = useState<Partial<Product>>({});
 
-  // Settings State
-  const [mpToken, setMpToken] = useState('');
+  // Settings State (PIX MANUAL)
+  const [pixConfig, setPixConfig] = useState<PixConfig>({
+    key: '',
+    bank: '',
+    owner: ''
+  });
 
   useEffect(() => {
-    // Load token from localStorage on mount
-    const savedToken = localStorage.getItem('mp_access_token');
-    if (savedToken) setMpToken(savedToken);
+    // Load settings from localStorage on mount
+    const savedKey = localStorage.getItem('creamy_pix_key') || '';
+    const savedBank = localStorage.getItem('creamy_pix_bank') || '';
+    const savedOwner = localStorage.getItem('creamy_pix_owner') || '';
+    setPixConfig({ key: savedKey, bank: savedBank, owner: savedOwner });
   }, []);
 
   const handleSaveSettings = () => {
-    localStorage.setItem('mp_access_token', mpToken);
-    alert('Configurações salvas com sucesso!');
+    localStorage.setItem('creamy_pix_key', pixConfig.key);
+    localStorage.setItem('creamy_pix_bank', pixConfig.bank);
+    localStorage.setItem('creamy_pix_owner', pixConfig.owner);
+    alert('Dados do Pix salvos com sucesso!');
   };
 
   const handleResetFinancials = () => {
@@ -114,9 +137,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
-    // Convert keys to CSV Header
     const headers = Object.keys(dataToExport[0]).join(',');
-    // Convert values to CSV Rows
     const rows = dataToExport.map(obj => 
         Object.values(obj).map(val => 
             typeof val === 'string' && val.includes(',') ? `"${val}"` : val 
@@ -155,7 +176,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     const newProduct = productForm as Product;
     
-    // Check if updating or creating
     const exists = products.find(p => p.id === newProduct.id);
     if (exists) {
       onEditProduct(newProduct);
@@ -167,7 +187,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
   
   const renderContent = () => {
-    // PRODUCTS VIEW
     if (activeView === 'products') {
       if (isEditingProduct) {
         return (
@@ -285,51 +304,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                onClick={() => handleOpenProductForm()} 
                className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-amber-700 flex items-center gap-2"
              >
-               <Plus size={18} /> Novo Produto
+               <Plus size={18} /> <span className="hidden md:inline">Novo Produto</span><span className="md:hidden">Novo</span>
              </button>
           </div>
-          <table className="w-full text-left text-sm text-slate-600">
-              <thead className="bg-slate-50 text-slate-500 font-medium">
-                  <tr>
-                      <th className="px-6 py-4">Produto</th>
-                      <th className="px-6 py-4">Categoria</th>
-                      <th className="px-6 py-4">Preço</th>
-                      <th className="px-6 py-4">Rating</th>
-                      <th className="px-6 py-4 text-right">Ações</th>
-                  </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                  {products.map((product) => (
-                      <tr key={product.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-4 flex items-center gap-3">
-                             <img src={product.image} className="w-10 h-10 rounded object-cover" alt="" />
-                             <div className="font-medium text-slate-900">{product.name}</div>
-                          </td>
-                          <td className="px-6 py-4 capitalize">{product.category}</td>
-                          <td className="px-6 py-4 font-bold text-slate-800">R$ {product.basePrice.toFixed(2)}</td>
-                          <td className="px-6 py-4">★ {product.rating}</td>
-                          <td className="px-6 py-4 text-right">
-                              <div className="flex justify-end gap-2">
-                                <button onClick={() => handleOpenProductForm(product)} className="p-2 text-slate-400 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-lg transition-colors">
-                                  <Pencil size={16} />
-                                </button>
-                                <button onClick={() => onDeleteProduct(product.id)} className="p-2 text-slate-400 hover:text-red-600 bg-slate-100 hover:bg-red-50 rounded-lg transition-colors">
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                          </td>
-                      </tr>
-                  ))}
-              </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+                <thead className="bg-slate-50 text-slate-500 font-medium">
+                    <tr>
+                        <th className="px-6 py-4">Produto</th>
+                        <th className="px-6 py-4">Categoria</th>
+                        <th className="px-6 py-4">Preço</th>
+                        <th className="px-6 py-4">Rating</th>
+                        <th className="px-6 py-4 text-right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                    {products.map((product) => (
+                        <tr key={product.id} className="hover:bg-slate-50 transition-colors">
+                            <td className="px-6 py-4 flex items-center gap-3">
+                               <img src={product.image} className="w-10 h-10 rounded object-cover" alt="" />
+                               <div className="font-medium text-slate-900 line-clamp-1">{product.name}</div>
+                            </td>
+                            <td className="px-6 py-4 capitalize">{product.category}</td>
+                            <td className="px-6 py-4 font-bold text-slate-800">R$ {product.basePrice.toFixed(2)}</td>
+                            <td className="px-6 py-4">★ {product.rating}</td>
+                            <td className="px-6 py-4 text-right">
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={() => handleOpenProductForm(product)} className="p-2 text-slate-400 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-lg transition-colors">
+                                    <Pencil size={16} />
+                                  </button>
+                                  <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onDeleteProduct(product.id);
+                                    }} 
+                                    className="p-2 text-slate-400 hover:text-red-600 bg-slate-100 hover:bg-red-50 rounded-lg transition-colors"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+          </div>
         </div>
       );
     }
 
-    // Orders View
     if (activeView === 'orders') {
         if (selectedOrder) {
-            // Detailed Order View
             return (
                 <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
                     <div className="p-6 border-b border-slate-100 flex items-center gap-4">
@@ -344,7 +369,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             {selectedOrder.status}
                         </span>
                     </div>
-                    <div className="p-8 grid grid-cols-2 gap-12">
+                    <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-12">
                         <div>
                             <h3 className="text-slate-400 font-bold uppercase text-xs tracking-wider mb-4">Itens do Pedido</h3>
                             <div className="space-y-4">
@@ -388,49 +413,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             );
         }
 
-        // List View
         return (
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-in fade-in duration-300">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="font-bold text-slate-800 text-xl">Gerenciamento de Pedidos em Tempo Real</h3>
-                <span className="text-xs font-bold bg-green-100 text-green-700 px-3 py-1 rounded-full animate-pulse">● Feed Ao Vivo</span>
+                <h3 className="font-bold text-slate-800 text-xl">Gerenciamento de Pedidos</h3>
+                <span className="text-xs font-bold bg-green-100 text-green-700 px-3 py-1 rounded-full animate-pulse hidden sm:inline-block">● Feed Ao Vivo</span>
             </div>
-            <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 text-slate-500 font-medium">
-                    <tr>
-                        <th className="px-6 py-4">ID do Pedido</th>
-                        <th className="px-6 py-4">Cliente</th>
-                        <th className="px-6 py-4">Total</th>
-                        <th className="px-6 py-4">Status</th>
-                        <th className="px-6 py-4">Ação</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                    {MOCK_ORDERS_DETAIL.map((order, i) => (
-                        <tr key={order.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedOrder(order)}>
-                            <td className="px-6 py-4 font-mono text-slate-500">{order.id}</td>
-                            <td className="px-6 py-4 font-medium text-slate-900">{order.customerName}</td>
-                            <td className="px-6 py-4">R$ {order.total.toFixed(2)}</td>
-                            <td className="px-6 py-4">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    order.status === 'Entregue' ? 'bg-green-100 text-green-800' : 
-                                    order.status === 'Preparando' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                                }`}>
-                                    {order.status}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4">
-                                <button className="text-amber-600 font-bold hover:underline">Ver</button>
-                            </td>
+            <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-600">
+                    <thead className="bg-slate-50 text-slate-500 font-medium">
+                        <tr>
+                            <th className="px-6 py-4">ID</th>
+                            <th className="px-6 py-4">Cliente</th>
+                            <th className="px-6 py-4">Total</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4">Ação</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {MOCK_ORDERS_DETAIL.map((order, i) => (
+                            <tr key={order.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                                <td className="px-6 py-4 font-mono text-slate-500">{order.id}</td>
+                                <td className="px-6 py-4 font-medium text-slate-900">{order.customerName}</td>
+                                <td className="px-6 py-4">R$ {order.total.toFixed(2)}</td>
+                                <td className="px-6 py-4">
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                        order.status === 'Entregue' ? 'bg-green-100 text-green-800' : 
+                                        order.status === 'Preparando' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                                    }`}>
+                                        {order.status}
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                    <button className="text-amber-600 font-bold hover:underline">Ver</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
           </div>
         );
     }
       
-    // Financials View
     if (activeView === 'financials') {
         const income = financials.filter(f => f.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
         const expense = financials.filter(f => f.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
@@ -443,11 +468,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    onClick={handleResetFinancials}
                    className="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"
                  >
-                   <Trash size={16} /> Zerar Financeiro
+                   <Trash size={16} /> <span className="hidden sm:inline">Zerar Financeiro</span>
                  </button>
              </div>
 
-             <div className="grid grid-cols-2 gap-6">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                  <div className="bg-white p-6 rounded-xl border border-slate-100">
                      <div className="flex justify-between items-start mb-2">
                         <div className="p-2 bg-green-100 rounded-lg"><TrendingUp className="text-green-600" /></div>
@@ -488,15 +513,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <tbody className="divide-y divide-slate-100">
                                 {financials.map((rec) => (
                                     <tr key={rec.id}>
-                                        <td className="p-3 text-slate-500 font-mono">{rec.date}</td>
-                                        <td className="p-3 font-medium text-slate-800">{rec.description}</td>
+                                        <td className="p-3 text-slate-500 font-mono whitespace-nowrap">{rec.date}</td>
+                                        <td className="p-3 font-medium text-slate-800 whitespace-nowrap">{rec.description}</td>
                                         <td className="p-3"><span className="bg-slate-100 px-2 py-1 rounded text-xs">{rec.category}</span></td>
                                         <td className="p-3">
                                             <span className={`text-xs font-bold ${rec.status === 'completed' ? 'text-green-600' : 'text-amber-600'}`}>
                                                 {rec.status === 'completed' ? 'Concluído' : 'Pendente'}
                                             </span>
                                         </td>
-                                        <td className={`p-3 text-right font-bold ${rec.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                        <td className={`p-3 text-right font-bold whitespace-nowrap ${rec.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                                             {rec.type === 'income' ? '+' : '-'} R$ {rec.amount.toFixed(2)}
                                         </td>
                                     </tr>
@@ -510,7 +535,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         );
     }
 
-    // Settings View
     if (activeView === 'settings') {
       return (
         <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -518,33 +542,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <div className="p-6 border-b border-slate-100">
                     <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                         <ShieldCheck className="text-amber-600" />
-                        Configurações de Pagamento
+                        Configurações de Pagamento (PIX)
                     </h2>
-                    <p className="text-slate-500 text-sm mt-1">Gerencie as integrações com provedores de pagamento.</p>
+                    <p className="text-slate-500 text-sm mt-1">Defina os dados da conta bancária para recebimento manual.</p>
                 </div>
                 <div className="p-8 space-y-6">
                     <div>
                         <div className="flex justify-between items-center mb-4">
                             <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                                <Key size={16} />
-                                Mercado Pago Access Token
+                                <Landmark size={16} />
+                                Dados da Conta
                             </label>
-                            <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold uppercase">Produção/Teste</span>
+                            <span className="text-[10px] bg-green-50 text-green-600 px-2 py-1 rounded font-bold uppercase">Manual</span>
                         </div>
-                        <div className="relative">
-                            <input 
-                                type="password" 
-                                value={mpToken}
-                                onChange={(e) => setMpToken(e.target.value)}
-                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-600"
-                                placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                            />
-                            <p className="text-xs text-slate-400 mt-2">
-                                Insira seu Access Token do Mercado Pago para habilitar cobranças reais via PIX.
-                                <br />
-                                Se deixado em branco, o sistema usará o modo de <strong>Simulação</strong>.
-                            </p>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Chave PIX</label>
+                                <input 
+                                    type="text" 
+                                    value={pixConfig.key}
+                                    onChange={(e) => setPixConfig({...pixConfig, key: e.target.value})}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-600"
+                                    placeholder="Ex: seuemail@loja.com, CPF ou Chave Aleatória"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Banco</label>
+                                    <input 
+                                        type="text" 
+                                        value={pixConfig.bank}
+                                        onChange={(e) => setPixConfig({...pixConfig, bank: e.target.value})}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-600"
+                                        placeholder="Ex: Nubank"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Titular</label>
+                                    <input 
+                                        type="text" 
+                                        value={pixConfig.owner}
+                                        onChange={(e) => setPixConfig({...pixConfig, owner: e.target.value})}
+                                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-600"
+                                        placeholder="Nome completo"
+                                    />
+                                </div>
+                            </div>
                         </div>
+
+                        <p className="text-xs text-slate-400 mt-4">
+                            Estes dados serão apresentados ao cliente na hora do pagamento para que ele faça a transferência manual.
+                        </p>
                     </div>
 
                     <div className="pt-4 border-t border-slate-50 flex justify-end">
@@ -553,20 +603,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200"
                         >
                             <Save size={18} />
-                            Salvar Configurações
+                            Salvar Dados PIX
                         </button>
                     </div>
                 </div>
             </div>
             
-            <div className="mt-6 bg-blue-50 border border-blue-100 rounded-xl p-6 flex gap-4">
-                 <div className="bg-blue-100 p-2 rounded-lg h-fit text-blue-600">
-                    <Activity size={24} />
+            <div className="mt-6 bg-green-50 border border-green-100 rounded-xl p-6 flex gap-4">
+                 <div className="bg-green-100 p-2 rounded-lg h-fit text-green-600">
+                    <CheckCircle size={24} />
                  </div>
                  <div>
-                    <h4 className="font-bold text-blue-800 mb-1">Status da Integração</h4>
-                    <p className="text-sm text-blue-600 leading-relaxed">
-                        {mpToken ? '✅ Token configurado. O sistema tentará processar pagamentos reais.' : '⚠️ Nenhum token detectado. O sistema está operando em modo de demonstração simulada.'}
+                    <h4 className="font-bold text-green-800 mb-1">Pagamento Ativo</h4>
+                    <p className="text-sm text-green-600 leading-relaxed">
+                        O sistema Pix Manual está configurado. O cliente verá um QR Code (gerado da chave) e os dados bancários para transferência.
                     </p>
                  </div>
             </div>
@@ -574,46 +624,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       );
     }
     
-    // Default: Overview
+    // Overview (Default Return for renderContent)
     return (
       <div className="animate-in fade-in duration-300">
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard title="Receita Total (Mensal)" value="R$ 1.2M" trend="+12.5%" isPositive={true} icon={<DollarSign size={20} />} />
-          <StatCard title="Pedidos Ativos" value="1,240" trend="+8.2%" isPositive={true} icon={<ShoppingBag size={20} />} />
-          <StatCard title="Assinantes do Clube" value="8.5k" trend="+22.4%" isPositive={true} icon={<Users size={20} />} />
-          <StatCard title="Ticket Médio" value="R$ 48.90" trend="-2.1%" isPositive={false} icon={<Activity size={20} />} />
+           <StatCard title="Receita Total" value="R$ 12.450" trend="+15%" isPositive={true} icon={<DollarSign />} />
+           <StatCard title="Pedidos" value="145" trend="+8%" isPositive={true} icon={<ShoppingBag />} />
+           <StatCard title="Novos Clientes" value="32" trend="+12%" isPositive={true} icon={<Users />} />
+           <StatCard title="Ticket Médio" value="R$ 85,90" trend="-2%" isPositive={false} icon={<Activity />} />
         </div>
 
-        {/* Main Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-2">
-            <h3 className="font-bold text-slate-800 mb-6">Trajetória de Receita</h3>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={revenueData}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#d97706" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#d97706" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                  <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} cursor={{stroke: '#d97706', strokeWidth: 1}} />
-                  <Area type="monotone" dataKey="revenue" stroke="#d97706" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+             <h3 className="font-bold text-slate-800 mb-6">Receita Semanal</h3>
+             <div className="h-64">
+               <ResponsiveContainer width="100%" height="100%">
+                 <AreaChart data={revenueData}>
+                   <defs>
+                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                       <stop offset="5%" stopColor="#d97706" stopOpacity={0.1}/>
+                       <stop offset="95%" stopColor="#d97706" stopOpacity={0}/>
+                     </linearGradient>
+                   </defs>
+                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                   <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} tickFormatter={(value) => `R$${value/1000}k`} />
+                   <Tooltip 
+                     contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                     formatter={(value: number) => [`R$ ${value}`, 'Receita']}
+                   />
+                   <Area type="monotone" dataKey="revenue" stroke="#d97706" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+                 </AreaChart>
+               </ResponsiveContainer>
+             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <h3 className="font-bold text-slate-800 mb-6">Mix de Produtos</h3>
-            <div className="h-80">
-               <ResponsiveContainer width="100%" height="100%">
+          <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+            <h3 className="font-bold text-slate-800 mb-6">Vendas por Categoria</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={categoryData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
+                  <Pie
+                    data={categoryData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
                     {categoryData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
@@ -627,24 +686,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
       </div>
     );
-  }
+  };
 
   return (
-    <div className="p-8 bg-slate-50 min-h-screen pl-72">
+    <div className="p-6 md:p-8 bg-slate-50 min-h-screen md:pl-72 transition-all">
       <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 font-serif capitalize">{activeView === 'overview' ? 'Visão Geral' : activeView === 'products' ? 'Produtos' : activeView === 'settings' ? 'Configurações' : activeView}</h1>
-          <p className="text-slate-500">Bem-vindo de volta, Estrategista.</p>
+        <div className="flex items-center gap-4">
+          <button onClick={onMenuClick} className="md:hidden p-2 text-slate-600 hover:bg-slate-200 rounded-lg">
+             <Menu size={24} />
+          </button>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 font-serif capitalize">{activeView === 'overview' ? 'Visão Geral' : activeView === 'products' ? 'Produtos' : activeView === 'settings' ? 'Configurações' : activeView}</h1>
+            <p className="text-slate-500 text-sm md:text-base">Bem-vindo de volta, Estrategista.</p>
+          </div>
         </div>
         <div className="flex gap-3">
-            <div className="bg-white px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 flex items-center gap-2">
+            <div className="bg-white px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hidden sm:flex items-center gap-2">
                 <Clock size={16} /> Últimos 7 Dias
             </div>
             <button 
               onClick={handleExport}
               className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-amber-200 hover:bg-amber-700 transition-colors active:scale-95 flex items-center gap-2"
             >
-                <Download size={16} /> Exportar CSV
+                <Download size={16} /> <span className="hidden sm:inline">Exportar CSV</span>
             </button>
         </div>
       </div>
