@@ -9,7 +9,12 @@ export const MOCK_PRODUCTS: Product[] = [
     image: 'https://images.unsplash.com/photo-1543363363-2384a307049b?q=80&w=800&auto=format&fit=crop',
     category: 'pudim',
     rating: 4.9,
-    isPopular: true
+    isPopular: true,
+    reviews: [
+      { id: 'r1', userName: 'Ana Clara', rating: 5, comment: 'O melhor pudim que já comi! Sem furinhos mesmo.', date: '10/10/2023' },
+      { id: 'r2', userName: 'Roberto F.', rating: 5, comment: 'Calda perfeita, não é enjoativa.', date: '12/10/2023' },
+      { id: 'r3', userName: 'Mariana S.', rating: 4, comment: 'Delicioso, mas chegou um pouquinho revirado.', date: '15/10/2023' }
+    ]
   },
   {
     id: '2',
@@ -19,7 +24,11 @@ export const MOCK_PRODUCTS: Product[] = [
     image: 'https://images.unsplash.com/photo-1541783245831-57d6fb0926d3?q=80&w=800&auto=format&fit=crop',
     category: 'mousse',
     rating: 4.8,
-    isPopular: true
+    isPopular: true,
+    reviews: [
+      { id: 'r4', userName: 'Felipe D.', rating: 5, comment: 'Para quem ama chocolate amargo, é o paraíso.', date: '05/11/2023' },
+      { id: 'r5', userName: 'Carla M.', rating: 5, comment: 'A textura é incrível, super aerada.', date: '08/11/2023' }
+    ]
   },
   {
     id: '3',
@@ -28,7 +37,10 @@ export const MOCK_PRODUCTS: Product[] = [
     basePrice: 32.90,
     image: 'https://images.unsplash.com/photo-1517438322307-e67111335449?q=80&w=800&auto=format&fit=crop',
     category: 'pudim',
-    rating: 4.9
+    rating: 4.9,
+    reviews: [
+      { id: 'r6', userName: 'Giulia B.', rating: 5, comment: 'Sabor de pistache de verdade, nada artificial.', date: '20/10/2023' }
+    ]
   },
   {
     id: '4',
@@ -38,7 +50,11 @@ export const MOCK_PRODUCTS: Product[] = [
     image: 'https://images.unsplash.com/photo-1624372076383-3928e469e5d4?q=80&w=800&auto=format&fit=crop',
     category: 'combo',
     rating: 5.0,
-    isPopular: true
+    isPopular: true,
+    reviews: [
+      { id: 'r7', userName: 'Pedro H.', rating: 5, comment: 'Ótimo para presentear! A embalagem é linda.', date: '01/11/2023' },
+      { id: 'r8', userName: 'Luciana T.', rating: 5, comment: 'O de Nutella é surreal.', date: '03/11/2023' }
+    ]
   },
   {
     id: '5',
@@ -47,7 +63,10 @@ export const MOCK_PRODUCTS: Product[] = [
     basePrice: 22.90,
     image: 'https://images.unsplash.com/photo-1514517220017-8ce97a34a7b6?q=80&w=800&auto=format&fit=crop',
     category: 'mousse',
-    rating: 4.7
+    rating: 4.7,
+    reviews: [
+        { id: 'r9', userName: 'Amanda C.', rating: 4, comment: 'Muito bom, bem azedinho como eu gosto.', date: '25/10/2023' }
+    ]
   }
 ];
 
@@ -104,24 +123,6 @@ export const MOCK_USER_HISTORY: UserOrder[] = [
     items: [
       { productId: '1', name: 'Pudim de Leite Clássico', quantity: 1, size: 'M' },
       { productId: '2', name: 'Mousse Belgian Dark', quantity: 1, size: 'P' }
-    ]
-  },
-  {
-    id: '2705',
-    date: '02 Out, 2024',
-    total: 32.90,
-    status: 'Entregue',
-    items: [
-      { productId: '3', name: 'Pudim de Pistache', quantity: 1, size: 'P' }
-    ]
-  },
-  {
-    id: '2540',
-    date: '25 Set, 2024',
-    total: 45.90,
-    status: 'Entregue',
-    items: [
-      { productId: '4', name: 'Combo Degustação', quantity: 1, size: 'P' }
     ]
   }
 ];

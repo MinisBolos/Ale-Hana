@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, Legend, BarChart, Bar
+  PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { ShoppingBag, DollarSign, Users, Activity, ArrowLeft, Download, CheckCircle, Clock, CreditCard, TrendingUp, TrendingDown } from 'lucide-react';
-import { StatCardProps, AdminView, OrderDetailType } from '../types';
-import { MOCK_FINANCIALS, MOCK_PARTNERS, MOCK_CAMPAIGNS, MOCK_ORDERS_DETAIL } from '../constants';
+import { ShoppingBag, DollarSign, Users, Activity, ArrowLeft, Download, CheckCircle, Clock, CreditCard, TrendingUp, TrendingDown, Plus, Pencil, Trash2, X, Save, Upload, Trash } from 'lucide-react';
+import { StatCardProps, AdminView, OrderDetailType, Product, FinancialRecord } from '../types';
+import { MOCK_FINANCIALS, MOCK_ORDERS_DETAIL } from '../constants';
 
 // Mock Data for Overview Charts
 const revenueData = [
@@ -43,10 +43,45 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, trend, isPositive, ic
 
 interface AdminDashboardProps {
   activeView: AdminView;
+  products: Product[];
+  onAddProduct: (product: Product) => void;
+  onEditProduct: (product: Product) => void;
+  onDeleteProduct: (id: string) => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeView }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
+  activeView, 
+  products, 
+  onAddProduct, 
+  onEditProduct,
+  onDeleteProduct 
+}) => {
   const [selectedOrder, setSelectedOrder] = useState<OrderDetailType | null>(null);
+  
+  // Financial State (allows reset)
+  const [financials, setFinancials] = useState<FinancialRecord[]>(MOCK_FINANCIALS);
+
+  // Product Management State
+  const [isEditingProduct, setIsEditingProduct] = useState(false);
+  const [productForm, setProductForm] = useState<Partial<Product>>({});
+
+  const handleResetFinancials = () => {
+    if (window.confirm("ATENÇÃO: Isso irá apagar todos os registros financeiros. Deseja continuar?")) {
+      setFinancials([]);
+    }
+  };
+
+  // Handle Image Upload logic
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProductForm({ ...productForm, image: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // CSV Export Logic
   const handleExport = () => {
@@ -55,13 +90,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeView }) =>
 
     switch(activeView) {
         case 'orders': dataToExport = MOCK_ORDERS_DETAIL; break;
-        case 'financials': dataToExport = MOCK_FINANCIALS; break;
-        case 'partners': dataToExport = MOCK_PARTNERS; break;
-        case 'campaigns': dataToExport = MOCK_CAMPAIGNS; break;
+        case 'financials': dataToExport = financials; break;
+        case 'products': dataToExport = products; break;
         default: dataToExport = revenueData; 
     }
 
-    if (!dataToExport.length) return;
+    if (!dataToExport.length) {
+      alert("Não há dados para exportar.");
+      return;
+    }
 
     // Convert keys to CSV Header
     const headers = Object.keys(dataToExport[0]).join(',');
@@ -81,8 +118,200 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeView }) =>
     link.click();
     document.body.removeChild(link);
   };
+
+  const handleOpenProductForm = (product?: Product) => {
+    if (product) {
+      setProductForm(product);
+    } else {
+      setProductForm({
+        id: Math.random().toString(36).substr(2, 9),
+        rating: 5.0,
+        isPopular: false,
+        category: 'pudim'
+      });
+    }
+    setIsEditingProduct(true);
+  };
+
+  const handleSaveProduct = () => {
+    if (!productForm.name || !productForm.basePrice || !productForm.image) {
+      alert("Preencha nome, preço e carregue uma imagem.");
+      return;
+    }
+
+    const newProduct = productForm as Product;
+    
+    // Check if updating or creating
+    const exists = products.find(p => p.id === newProduct.id);
+    if (exists) {
+      onEditProduct(newProduct);
+    } else {
+      onAddProduct(newProduct);
+    }
+    setIsEditingProduct(false);
+    setProductForm({});
+  };
   
   const renderContent = () => {
+    // PRODUCTS VIEW
+    if (activeView === 'products') {
+      if (isEditingProduct) {
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8 max-w-2xl mx-auto animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-slate-800">{products.find(p => p.id === productForm.id) ? 'Editar Produto' : 'Novo Produto'}</h2>
+              <button onClick={() => setIsEditingProduct(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Nome do Produto</label>
+                <input 
+                  type="text" 
+                  value={productForm.name || ''} 
+                  onChange={e => setProductForm({...productForm, name: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg p-3 focus:outline-none focus:border-amber-500"
+                  placeholder="Ex: Pudim de Leite"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Descrição</label>
+                <textarea 
+                  value={productForm.description || ''} 
+                  onChange={e => setProductForm({...productForm, description: e.target.value})}
+                  className="w-full border border-slate-200 rounded-lg p-3 focus:outline-none focus:border-amber-500 h-24"
+                  placeholder="Descreva o sabor e textura..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Preço Base (R$)</label>
+                  <input 
+                    type="number" 
+                    value={productForm.basePrice || ''} 
+                    onChange={e => setProductForm({...productForm, basePrice: parseFloat(e.target.value)})}
+                    className="w-full border border-slate-200 rounded-lg p-3 focus:outline-none focus:border-amber-500"
+                    placeholder="0.00"
+                    step="0.10"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Categoria</label>
+                  <select 
+                    value={productForm.category || 'pudim'} 
+                    onChange={e => setProductForm({...productForm, category: e.target.value as any})}
+                    className="w-full border border-slate-200 rounded-lg p-3 focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="pudim">Pudim</option>
+                    <option value="mousse">Mousse</option>
+                    <option value="combo">Combo</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Imagem do Produto</label>
+                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                    <div className="flex items-center gap-4">
+                         <label className="cursor-pointer bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 shadow-sm transition-colors">
+                            <Upload size={18} />
+                            Carregar Imagem
+                            <input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={handleImageUpload}
+                                className="hidden"
+                            />
+                        </label>
+                        <span className="text-xs text-slate-500">Ou cole a URL abaixo</span>
+                    </div>
+                    
+                    <input 
+                      type="text" 
+                      value={productForm.image || ''} 
+                      onChange={e => setProductForm({...productForm, image: e.target.value})}
+                      className="w-full border border-slate-200 rounded-lg p-3 mt-3 text-xs focus:outline-none focus:border-amber-500"
+                      placeholder="https://..."
+                    />
+
+                    {productForm.image && (
+                      <div className="mt-3 h-40 w-full rounded-lg overflow-hidden border border-slate-200 bg-white flex items-center justify-center">
+                        <img src={productForm.image} alt="Preview" className="h-full object-contain" />
+                      </div>
+                    )}
+                </div>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                 <button 
+                  onClick={handleSaveProduct}
+                  className="flex-1 bg-amber-600 text-white py-3 rounded-lg font-bold hover:bg-amber-700 flex justify-center items-center gap-2"
+                 >
+                   <Save size={18} /> Salvar Produto
+                 </button>
+                 <button 
+                  onClick={() => setIsEditingProduct(false)}
+                  className="px-6 border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-50"
+                 >
+                   Cancelar
+                 </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-in fade-in duration-300">
+          <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+             <h3 className="font-bold text-slate-800 text-xl">Catálogo de Produtos</h3>
+             <button 
+               onClick={() => handleOpenProductForm()} 
+               className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-amber-700 flex items-center gap-2"
+             >
+               <Plus size={18} /> Novo Produto
+             </button>
+          </div>
+          <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-50 text-slate-500 font-medium">
+                  <tr>
+                      <th className="px-6 py-4">Produto</th>
+                      <th className="px-6 py-4">Categoria</th>
+                      <th className="px-6 py-4">Preço</th>
+                      <th className="px-6 py-4">Rating</th>
+                      <th className="px-6 py-4 text-right">Ações</th>
+                  </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                  {products.map((product) => (
+                      <tr key={product.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4 flex items-center gap-3">
+                             <img src={product.image} className="w-10 h-10 rounded object-cover" alt="" />
+                             <div className="font-medium text-slate-900">{product.name}</div>
+                          </td>
+                          <td className="px-6 py-4 capitalize">{product.category}</td>
+                          <td className="px-6 py-4 font-bold text-slate-800">R$ {product.basePrice.toFixed(2)}</td>
+                          <td className="px-6 py-4">★ {product.rating}</td>
+                          <td className="px-6 py-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button onClick={() => handleOpenProductForm(product)} className="p-2 text-slate-400 hover:text-amber-600 bg-slate-100 hover:bg-amber-50 rounded-lg transition-colors">
+                                  <Pencil size={16} />
+                                </button>
+                                <button onClick={() => onDeleteProduct(product.id)} className="p-2 text-slate-400 hover:text-red-600 bg-slate-100 hover:bg-red-50 rounded-lg transition-colors">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                          </td>
+                      </tr>
+                  ))}
+              </tbody>
+          </table>
+        </div>
+      );
+    }
+
     // Orders View
     if (activeView === 'orders') {
         if (selectedOrder) {
@@ -189,16 +418,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeView }) =>
       
     // Financials View
     if (activeView === 'financials') {
-        const income = MOCK_FINANCIALS.filter(f => f.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
-        const expense = MOCK_FINANCIALS.filter(f => f.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
+        const income = financials.filter(f => f.type === 'income').reduce((acc, curr) => acc + curr.amount, 0);
+        const expense = financials.filter(f => f.type === 'expense').reduce((acc, curr) => acc + curr.amount, 0);
         
         return (
           <div className="space-y-6 animate-in fade-in duration-300">
+             <div className="flex justify-between items-center">
+                 <h2 className="text-xl font-bold text-slate-800">Resumo Financeiro</h2>
+                 <button 
+                   onClick={handleResetFinancials}
+                   className="bg-red-50 text-red-600 border border-red-100 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-100 flex items-center gap-2"
+                 >
+                   <Trash size={16} /> Zerar Financeiro
+                 </button>
+             </div>
+
              <div className="grid grid-cols-2 gap-6">
                  <div className="bg-white p-6 rounded-xl border border-slate-100">
                      <div className="flex justify-between items-start mb-2">
                         <div className="p-2 bg-green-100 rounded-lg"><TrendingUp className="text-green-600" /></div>
-                        <span className="text-green-600 font-bold text-sm">+12%</span>
+                        {financials.length > 0 && <span className="text-green-600 font-bold text-sm">+12%</span>}
                      </div>
                      <p className="text-slate-500 text-sm">Entradas Totais</p>
                      <p className="text-2xl font-bold text-slate-800">R$ {income.toFixed(2)}</p>
@@ -206,7 +445,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeView }) =>
                  <div className="bg-white p-6 rounded-xl border border-slate-100">
                      <div className="flex justify-between items-start mb-2">
                         <div className="p-2 bg-red-100 rounded-lg"><TrendingDown className="text-red-600" /></div>
-                        <span className="text-red-600 font-bold text-sm">+5%</span>
+                        {financials.length > 0 && <span className="text-red-600 font-bold text-sm">+5%</span>}
                      </div>
                      <p className="text-slate-500 text-sm">Saídas Totais</p>
                      <p className="text-2xl font-bold text-slate-800">R$ {expense.toFixed(2)}</p>
@@ -215,124 +454,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeView }) =>
 
              <div className="bg-white p-6 rounded-xl border border-slate-100">
                 <h3 className="font-bold text-slate-800 mb-6">Últimas Transações</h3>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-slate-50 text-slate-500">
-                            <tr>
-                                <th className="p-3 rounded-l-lg">Data</th>
-                                <th className="p-3">Descrição</th>
-                                <th className="p-3">Categoria</th>
-                                <th className="p-3">Status</th>
-                                <th className="p-3 rounded-r-lg text-right">Valor</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {MOCK_FINANCIALS.map((rec) => (
-                                <tr key={rec.id}>
-                                    <td className="p-3 text-slate-500 font-mono">{rec.date}</td>
-                                    <td className="p-3 font-medium text-slate-800">{rec.description}</td>
-                                    <td className="p-3"><span className="bg-slate-100 px-2 py-1 rounded text-xs">{rec.category}</span></td>
-                                    <td className="p-3">
-                                        <span className={`text-xs font-bold ${rec.status === 'completed' ? 'text-green-600' : 'text-amber-600'}`}>
-                                            {rec.status === 'completed' ? 'Concluído' : 'Pendente'}
-                                        </span>
-                                    </td>
-                                    <td className={`p-3 text-right font-bold ${rec.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
-                                        {rec.type === 'income' ? '+' : '-'} R$ {rec.amount.toFixed(2)}
-                                    </td>
+                {financials.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400">
+                        <DollarSign className="mx-auto mb-2 opacity-50" size={32} />
+                        <p>Nenhum registro financeiro encontrado.</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50 text-slate-500">
+                                <tr>
+                                    <th className="p-3 rounded-l-lg">Data</th>
+                                    <th className="p-3">Descrição</th>
+                                    <th className="p-3">Categoria</th>
+                                    <th className="p-3">Status</th>
+                                    <th className="p-3 rounded-r-lg text-right">Valor</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {financials.map((rec) => (
+                                    <tr key={rec.id}>
+                                        <td className="p-3 text-slate-500 font-mono">{rec.date}</td>
+                                        <td className="p-3 font-medium text-slate-800">{rec.description}</td>
+                                        <td className="p-3"><span className="bg-slate-100 px-2 py-1 rounded text-xs">{rec.category}</span></td>
+                                        <td className="p-3">
+                                            <span className={`text-xs font-bold ${rec.status === 'completed' ? 'text-green-600' : 'text-amber-600'}`}>
+                                                {rec.status === 'completed' ? 'Concluído' : 'Pendente'}
+                                            </span>
+                                        </td>
+                                        <td className={`p-3 text-right font-bold ${rec.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
+                                            {rec.type === 'income' ? '+' : '-'} R$ {rec.amount.toFixed(2)}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
              </div>
           </div>
         );
     }
     
-    // Partners View
-    if (activeView === 'partners') {
-        return (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
-                {MOCK_PARTNERS.map(partner => (
-                    <div key={partner.id} className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center text-indigo-600 font-bold text-xl">
-                                {partner.name.charAt(0)}
-                            </div>
-                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${partner.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                                {partner.status}
-                            </span>
-                        </div>
-                        <h3 className="font-bold text-slate-800 text-lg mb-1">{partner.name}</h3>
-                        <p className="text-slate-400 text-sm mb-4">{partner.type}</p>
-                        <div className="flex justify-between pt-4 border-t border-slate-50">
-                            <div>
-                                <span className="block text-xs text-slate-400 uppercase">Receita Gerada</span>
-                                <span className="font-bold text-slate-800">R$ {partner.revenue.toLocaleString()}</span>
-                            </div>
-                            <div className="text-right">
-                                <span className="block text-xs text-slate-400 uppercase">Pedidos</span>
-                                <span className="font-bold text-slate-800">{partner.orders}</span>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
-    }
-
-    // Campaigns View
-    if (activeView === 'campaigns') {
-        return (
-            <div className="space-y-6 animate-in fade-in duration-300">
-                <div className="bg-indigo-600 rounded-xl p-8 text-white relative overflow-hidden">
-                     <div className="relative z-10">
-                        <h2 className="text-2xl font-bold mb-2">Painel de Marketing</h2>
-                        <p className="opacity-80">Acompanhe o ROI e alcance de suas campanhas ativas.</p>
-                     </div>
-                     <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-indigo-500 to-transparent opacity-50"></div>
-                </div>
-
-                <div className="bg-white rounded-xl border border-slate-100 overflow-hidden">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 text-slate-500 text-sm">
-                            <tr>
-                                <th className="p-4">Nome da Campanha</th>
-                                <th className="p-4">Status</th>
-                                <th className="p-4">Alcance</th>
-                                <th className="p-4">Conversão</th>
-                                <th className="p-4">Custo</th>
-                                <th className="p-4 text-right">ROI (Est.)</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 text-sm">
-                            {MOCK_CAMPAIGNS.map(camp => (
-                                <tr key={camp.id}>
-                                    <td className="p-4 font-bold text-slate-800">{camp.name}</td>
-                                    <td className="p-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                                            camp.status === 'Active' ? 'bg-green-100 text-green-700' :
-                                            camp.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'
-                                        }`}>
-                                            {camp.status}
-                                        </span>
-                                    </td>
-                                    <td className="p-4">{camp.reach.toLocaleString()}</td>
-                                    <td className="p-4">{camp.conversion}%</td>
-                                    <td className="p-4">R$ {camp.cost}</td>
-                                    <td className="p-4 text-right font-bold text-indigo-600">
-                                        {camp.status === 'Active' || camp.status === 'Ended' ? ((camp.reach * (camp.conversion/100) * 25) / camp.cost).toFixed(1) + 'x' : '-'}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        );
-    }
-
     // Default: Overview
     return (
       <div className="animate-in fade-in duration-300">
@@ -392,7 +555,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ activeView }) =>
     <div className="p-8 bg-slate-50 min-h-screen pl-72">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 font-serif capitalize">{activeView === 'overview' ? 'Visão Geral' : activeView}</h1>
+          <h1 className="text-3xl font-bold text-slate-900 font-serif capitalize">{activeView === 'overview' ? 'Visão Geral' : activeView === 'products' ? 'Produtos' : activeView}</h1>
           <p className="text-slate-500">Bem-vindo de volta, Estrategista.</p>
         </div>
         <div className="flex gap-3">

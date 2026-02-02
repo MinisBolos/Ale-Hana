@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, ShoppingBag, User, LayoutDashboard } from 'lucide-react';
+import { Home, ShoppingBag, User, Lock } from 'lucide-react';
 import { AppMode } from '../types';
 
 interface NavBarProps {
@@ -7,10 +7,10 @@ interface NavBarProps {
   setPage: (page: string) => void;
   cartCount: number;
   mode: AppMode;
-  setMode: (mode: AppMode) => void;
+  onAdminClick: () => void;
 }
 
-export const NavBar: React.FC<NavBarProps> = ({ currentPage, setPage, cartCount, mode, setMode }) => {
+export const NavBar: React.FC<NavBarProps> = ({ currentPage, setPage, cartCount, mode, onAdminClick }) => {
   if (mode === AppMode.ADMIN) return null;
 
   return (
@@ -25,6 +25,7 @@ export const NavBar: React.FC<NavBarProps> = ({ currentPage, setPage, cartCount,
         </button>
 
         <button 
+          id="nav-cart-icon"
           onClick={() => setPage('cart')}
           className={`flex flex-col items-center gap-1 relative ${currentPage === 'cart' ? 'text-amber-600' : 'text-gray-400'}`}
         >
@@ -47,12 +48,12 @@ export const NavBar: React.FC<NavBarProps> = ({ currentPage, setPage, cartCount,
           <span className="text-[10px] font-medium">Perfil</span>
         </button>
         
-        {/* Hidden trigger for demo purposes to switch to Admin */}
+        {/* Trigger for Admin Login */}
         <button 
-          onClick={() => setMode(AppMode.ADMIN)}
+          onClick={onAdminClick}
           className="flex flex-col items-center gap-1 text-gray-400 opacity-50 hover:opacity-100"
         >
-          <LayoutDashboard size={24} />
+          <Lock size={24} />
           <span className="text-[10px] font-medium">Admin</span>
         </button>
       </div>

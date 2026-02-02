@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingCart, Users, PieChart, TrendingUp, LogOut } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, TrendingUp, LogOut, Package } from 'lucide-react';
 import { AppMode, AdminView } from '../types';
 
 interface AdminSidebarProps {
@@ -12,9 +12,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ setMode, activeView,
   const menuItems: { id: AdminView; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Visão Geral', icon: <LayoutDashboard size={20} /> },
     { id: 'orders', label: 'Pedidos (Ao Vivo)', icon: <ShoppingCart size={20} /> },
+    { id: 'products', label: 'Produtos', icon: <Package size={20} /> },
     { id: 'financials', label: 'Financeiro', icon: <TrendingUp size={20} /> },
-    { id: 'partners', label: 'Parceiros & B2B', icon: <Users size={20} /> },
-    { id: 'campaigns', label: 'Campanhas', icon: <PieChart size={20} /> },
   ];
 
   return (

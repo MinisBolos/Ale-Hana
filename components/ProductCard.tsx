@@ -5,9 +5,10 @@ import { Product } from '../types';
 interface ProductCardProps {
   product: Product;
   onClick: (product: Product) => void;
+  onQuickAdd: (product: Product, event: React.MouseEvent) => void;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick, onQuickAdd }) => {
   return (
     <div 
       className="bg-white rounded-xl overflow-hidden shadow-sm border border-amber-50 hover:shadow-md transition-all cursor-pointer group"
@@ -33,7 +34,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onClick }) =>
         <p className="text-gray-400 text-xs line-clamp-2 mb-3 h-8">{product.description}</p>
         <div className="flex justify-between items-center">
           <span className="font-bold text-gray-900">R$ {product.basePrice.toFixed(2)}</span>
-          <button className="bg-amber-100 p-1.5 rounded-full text-amber-700 hover:bg-amber-200 transition-colors">
+          <button 
+            onClick={(e) => {
+              e.stopPropagation(); // Evita abrir o detalhe do produto
+              onQuickAdd(product, e);
+            }}
+            className="bg-amber-100 p-1.5 rounded-full text-amber-700 hover:bg-amber-200 transition-colors active:scale-90"
+          >
             <Plus size={16} />
           </button>
         </div>
