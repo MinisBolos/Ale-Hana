@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { ShoppingBag, DollarSign, Users, Activity, ArrowLeft, Download, CheckCircle, Clock, CreditCard, TrendingUp, TrendingDown, Plus, Pencil, Trash2, X, Save, Upload, Trash } from 'lucide-react';
+import { ShoppingBag, DollarSign, Users, Activity, ArrowLeft, Download, CheckCircle, Clock, CreditCard, TrendingUp, TrendingDown, Plus, Pencil, Trash2, X, Save, Upload, Trash, ShieldCheck, Key } from 'lucide-react';
 import { StatCardProps, AdminView, OrderDetailType, Product, FinancialRecord } from '../types';
 import { MOCK_FINANCIALS, MOCK_ORDERS_DETAIL } from '../constants';
 
@@ -64,6 +64,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Product Management State
   const [isEditingProduct, setIsEditingProduct] = useState(false);
   const [productForm, setProductForm] = useState<Partial<Product>>({});
+
+  // Settings State
+  const [mpToken, setMpToken] = useState('');
+
+  useEffect(() => {
+    // Load token from localStorage on mount
+    const savedToken = localStorage.getItem('mp_access_token');
+    if (savedToken) setMpToken(savedToken);
+  }, []);
+
+  const handleSaveSettings = () => {
+    localStorage.setItem('mp_access_token', mpToken);
+    alert('Configurações salvas com sucesso!');
+  };
 
   const handleResetFinancials = () => {
     if (window.confirm("ATENÇÃO: Isso irá apagar todos os registros financeiros. Deseja continuar?")) {
@@ -495,6 +509,70 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         );
     }
+
+    // Settings View
+    if (activeView === 'settings') {
+      return (
+        <div className="max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+                <div className="p-6 border-b border-slate-100">
+                    <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <ShieldCheck className="text-amber-600" />
+                        Configurações de Pagamento
+                    </h2>
+                    <p className="text-slate-500 text-sm mt-1">Gerencie as integrações com provedores de pagamento.</p>
+                </div>
+                <div className="p-8 space-y-6">
+                    <div>
+                        <div className="flex justify-between items-center mb-4">
+                            <label className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                <Key size={16} />
+                                Mercado Pago Access Token
+                            </label>
+                            <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-1 rounded font-bold uppercase">Produção/Teste</span>
+                        </div>
+                        <div className="relative">
+                            <input 
+                                type="password" 
+                                value={mpToken}
+                                onChange={(e) => setMpToken(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-4 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 text-slate-600"
+                                placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                            />
+                            <p className="text-xs text-slate-400 mt-2">
+                                Insira seu Access Token do Mercado Pago para habilitar cobranças reais via PIX.
+                                <br />
+                                Se deixado em branco, o sistema usará o modo de <strong>Simulação</strong>.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-50 flex justify-end">
+                        <button 
+                            onClick={handleSaveSettings}
+                            className="bg-gray-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-lg shadow-gray-200"
+                        >
+                            <Save size={18} />
+                            Salvar Configurações
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div className="mt-6 bg-blue-50 border border-blue-100 rounded-xl p-6 flex gap-4">
+                 <div className="bg-blue-100 p-2 rounded-lg h-fit text-blue-600">
+                    <Activity size={24} />
+                 </div>
+                 <div>
+                    <h4 className="font-bold text-blue-800 mb-1">Status da Integração</h4>
+                    <p className="text-sm text-blue-600 leading-relaxed">
+                        {mpToken ? '✅ Token configurado. O sistema tentará processar pagamentos reais.' : '⚠️ Nenhum token detectado. O sistema está operando em modo de demonstração simulada.'}
+                    </p>
+                 </div>
+            </div>
+        </div>
+      );
+    }
     
     // Default: Overview
     return (
@@ -555,7 +633,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     <div className="p-8 bg-slate-50 min-h-screen pl-72">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 font-serif capitalize">{activeView === 'overview' ? 'Visão Geral' : activeView === 'products' ? 'Produtos' : activeView}</h1>
+          <h1 className="text-3xl font-bold text-slate-900 font-serif capitalize">{activeView === 'overview' ? 'Visão Geral' : activeView === 'products' ? 'Produtos' : activeView === 'settings' ? 'Configurações' : activeView}</h1>
           <p className="text-slate-500">Bem-vindo de volta, Estrategista.</p>
         </div>
         <div className="flex gap-3">

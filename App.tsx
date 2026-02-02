@@ -215,7 +215,11 @@ const App: React.FC = () => {
     if (cartItems.length === 0) return;
     
     setIsProcessingPayment(true);
-    const response = await createPixPayment(cartItems, cartTotal);
+    
+    // Pass current logged in user email if available, otherwise default is used inside service
+    const userEmail = currentUser?.email;
+    const response = await createPixPayment(cartItems, cartTotal, userEmail);
+    
     setIsProcessingPayment(false);
     
     if (response) {

@@ -40,7 +40,7 @@ export enum AppMode {
   ADMIN = 'ADMIN'
 }
 
-export type AdminView = 'overview' | 'orders' | 'financials' | 'products';
+export type AdminView = 'overview' | 'orders' | 'financials' | 'products' | 'settings';
 
 export interface ToastNotification {
   id: string;
